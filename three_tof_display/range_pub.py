@@ -1,22 +1,24 @@
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import String
 
 
 class RangePublisher(Node):
 
     def __init__(self):
         super().__init__('range_publisher')
-        self.publisher_ = self.create_publisher(Int16MultiArray, 'range_array', 10)
-        timer_period = 1.0  # seconds
+        self.publisher_ = self.create_publisher(String, 'tof8x8x3_msg', 10)
+        timer_period = 5.0  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.range = -1
 
     def timer_callback(self):
-        msg = Int16MultiArray()
-        range_array = [self.range + i*10 for i in range(64)]
-        msg.data = range_array
+        msg = String()
+        range_string = 'TOF8x8x3'
+        for i in range(192):
+            range_string = range_string + ' ' + str(self.range + i*5)
+        msg.data = range_string
         self.publisher_.publish(msg)
         #self.get_logger().info('Publishing')
         self.range += 1000

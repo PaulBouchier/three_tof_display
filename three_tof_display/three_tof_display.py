@@ -4,8 +4,9 @@ from rclpy.node import Node
 import tkinter as tk
 from tkinter import ttk
 import threading
+import sys
 
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import String
 
 class ThreeTofDisplay(Node):
 
@@ -14,21 +15,39 @@ class ThreeTofDisplay(Node):
         self.get_logger().info('Starting three_tof_display.')
 
         self.color = -1
-        self.range_array = [[x + 0.1*y for x in range(8)] for y in range(8)]
-        self.frame_array = [['' for x in range(8)] for y in range(8)]
-        self.label_array = [['' for x in range(8)] for y in range(8)]
-        self.color_sub = self.create_subscription(
-            Int16MultiArray, 'range_array', self.range_listener_cb, 10
-        )
+        self.range_array = [[x + 0.1*y for x in range(24)] for y in range(8)]
+        self.frame_array = [['' for x in range(24)] for y in range(8)]
+        self.label_array = [['' for x in range(24)] for y in range(8)]
+
+        self.tof8x8x3_subscription = self.create_subscription(String, 'tof8x8x3_msg', self.range_listener_cb, 10)
+
         self.window_thread = threading.Thread(target=self.window_thread_entry)
         self.window_thread.start()
 
     def range_listener_cb(self, msg):
         #self.get_logger().info('got range msg')
-        for i in range(8):
-            for j in range(8):
-                range_mm = float(msg.data[i*8+j])
-                self.range_array[i][j] = range_mm
+        try:
+            #split msg string into 193 seperate strings 1 for each element
+            tofStrArray = msg.data.split(" ")
+
+            # parse messsage of "name" then 192 integers (8 rows of 24 distances)
+            if tofStrArray[0]!="TOF8x8x3" or len(tofStrArray)!=193:
+                self.get_logger().error(f"TOF8x8x3 type message error: length: {len(tofStrArray)} {msg.data}")
+                return
+    
+            for i in range(8):
+                for j in range(24):
+                    range_mm = float(tofStrArray[i*24+j+1])     # +1 skips over first element, which is header
+                    self.range_array[i][j] = range_mm
+        except Exception as e:
+            print("exception, i, j: ", i, j)
+            print(e)
+            import traceback
+            traceback.print_exc()
+            self.get_logger().fatal("Exception in range_listener, exiting")
+            sys.exit()
+
+
 
     """
     range is in mm.
@@ -65,28 +84,30 @@ class ThreeTofDisplay(Node):
             green = 0
             blue = 250 - range_increment
         else:
-            range_color = "dark grey"
+            range_color = "black"
             named_color = True
         
         if (named_color):
-            range_color = named_color
+            text_color = "white"
         else:
             range_color = '#%02x%02x%02x'%(red, green, blue)
-            print(range, red, green, blue, range_color)
-        return range_color
+            text_color = '#%02x%02x%02x'%(250-red, 250-green, 250-blue)
+
+            # print('range: {:.2f} colors: {} {} {} range_color: {}'.format(range, red, green, blue, range_color))
+        return text_color, range_color
 
     def update_display(self):
-        self.get_logger().info("updating display")
+        self.get_logger().debug("updating display")
         for i in range(8):
-            for j in range(8):
-                range_string = '{0:.3f}'.format(self.range_array[i][j]/1000)
-                range_color = self.range2color(self.range_array[i][j])
+            for j in range(24):
+                range_string = '{:.2f}'.format(self.range_array[i][j]/1000)
+                text_color, range_color = self.range2color(self.range_array[i][j])
                 self.label_array[i][j]['text'] = range_string
-                self.label_array[i][j]['fg'] = "white"
                 try:
                     self.label_array[i][j]['bg'] = range_color
+                    self.label_array[i][j]['fg'] = text_color
                 except Exception as e:
-                    print(range_color)
+                    print('range_color: ', range_color, 'text_color:', text_color)
                     print("Exception: ", e)
                 self.label_array[i][j].pack()
 
@@ -100,7 +121,7 @@ class ThreeTofDisplay(Node):
         for i in range(8):
             self.window.columnconfigure(i, weight=1, minsize=50)
             self.window.rowconfigure(i, weight=1, minsize=50)
-            for j in range(8):
+            for j in range(24):
                 self.frame_array[i][j] = tk.Frame(
                     master = self.window,
                     relief = tk.RAISED,
