@@ -12,4 +12,4 @@ for close, through green to blue for far away. Black is no valid range.
 The input message is a space-delimited list of ranges in mm preceeded by a message type identifier.
 
 The image below shows a sample output:
-![GUI displaying three 8x8 ToF sensors side-by-side](/assets/images/24x8SampleDisplay.png)
+![GUI displaying three 8x8 ToF sensors side-by-side](/images/24x8SampleDisplay.png)
